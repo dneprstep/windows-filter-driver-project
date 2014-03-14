@@ -40,32 +40,6 @@ FilterLoad
     __in DEVICE_TYPE VolumeDeviceType,
     __in FLT_FILESYSTEM_TYPE VolumeFilesystemType
 )
-/*++
-
-Routine Description:
-
-    This routine is called by the filter manager when a new instance is created.
-    We specified in the registry that we only want for manual attachments,
-    so that is all we should receive here.
-
-Arguments:
-
-    FltObjects - Describes the instance and volume which we are being asked to
-        setup.
-
-    Flags - Flags describing the type of attachment this is.
-
-    VolumeDeviceType - The DEVICE_TYPE for the volume to which this instance
-        will attach.
-
-    VolumeFileSystemType - The file system formatted on this volume.
-
-Return Value:
-
-  FLT_NOTIFY_STATUS_ATTACH              - we wish to attach to the volume
-  FLT_NOTIFY_STATUS_DO_NOT_ATTACH       - no, thank you
-
---*/
 {
     UNREFERENCED_PARAMETER( FltObjects );
     UNREFERENCED_PARAMETER( Flags );
@@ -88,6 +62,21 @@ Return Value:
     return STATUS_SUCCESS;
 }
 
+NTSTATUS
+ScannerUnload (
+    __in FLT_FILTER_UNLOAD_FLAGS Flags
+    )
+{
+    UNREFERENCED_PARAMETER( Flags );
+
+    //
+    //  Unregister the filter
+    //
+
+    FltUnregisterFilter( FilterData.pFilter );
+
+    return STATUS_SUCCESS;
+}
 
 NTSTATUS
 DriverEntry 
