@@ -2,6 +2,17 @@
 
 FILTERDATA FilterData;
 
+const FLT_OPERATION_REGISTRATION Callbacks[] = 
+{
+//  Calbacks routins for our filter
+    { IRP_MJ_CREATE,
+      0,
+      NULL,
+      NULL},
+
+    { IRP_MJ_OPERATION_END }
+};
+
 CONST FLT_REGISTRATION FilterRegistration = 
 {
 
@@ -21,16 +32,6 @@ CONST FLT_REGISTRATION FilterRegistration =
     NULL            //  NormalizeNameComponent
 };
 
-const FLT_OPERATION_REGISTRATION Callbacks[] = 
-{
-//  Calbacks routins for our filter
-    { IRP_MJ_CREATE,
-      0,
-      NULL,
-      NULL},
-
-    { IRP_MJ_OPERATION_END }
-};
 
 NTSTATUS
 FilterLoad 
@@ -47,7 +48,7 @@ FilterLoad
 
     PAGED_CODE();
 
-    ASSERT( FltObjects->Filter == ScannerData.Filter );
+    ASSERT( FltObjects->Filter == FilterData.pFilter );
 
     //
     //  Don't attach to network volumes.
@@ -63,7 +64,7 @@ FilterLoad
 }
 
 NTSTATUS
-ScannerUnload (
+FilterUnload (
     __in FLT_FILTER_UNLOAD_FLAGS Flags
     )
 {
