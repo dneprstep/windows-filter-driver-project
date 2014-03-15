@@ -1,3 +1,9 @@
+#ifndef __FILTER_H__
+#define __FILTER_H__
+
+#include <Fltkernel.h>
+
+
 typedef struct _FILTERDATA
 {
     PDRIVER_OBJECT pDriverObject;
@@ -35,3 +41,5 @@ FilterLoad
     __in DEVICE_TYPE VolumeDeviceType,
     __in FLT_FILESYSTEM_TYPE VolumeFilesystemType
 );
+
+#endif /* __FILTER_H__ */
