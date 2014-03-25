@@ -9,6 +9,11 @@ const FLT_OPERATION_REGISTRATION Callbacks[] =
       0,
       NULL,
       NULL},
+	{ IRP_MJ_DIRECTORY_CONTROL,
+      0,
+      FilterPreDirectoryControl,
+      FilterPostDirectoryControl 
+	},
 
     { IRP_MJ_OPERATION_END }
 };
@@ -86,6 +91,9 @@ DriverEntry
     __in PUNICODE_STRING RegistryPath
 )
 {
+
+
+
 	NTSTATUS status;
 	
 	UNREFERENCED_PARAMETER( RegistryPath );
@@ -115,8 +123,77 @@ DriverEntry
          return status;
 	}
 
-	DbgPrint("MiniFilter:  Driver was started success.";
+	DbgPrint("MiniFilter:  Driver was started success.");
 	return STATUS_SUCCESS;
 
 
+}
+
+
+FLT_PREOP_CALLBACK_STATUS
+	FilterPreDirectoryControl (
+	__inout PFLT_CALLBACK_DATA Data,
+	__in PCFLT_RELATED_OBJECTS FltObjects,
+	__deref_out_opt PVOID *CompletionContext
+	)
+{
+	PFLT_FILE_NAME_INFORMATION nameInfo;
+
+	
+	if (!NT_SUCCESS( Data->IoStatus.Status )) 
+	{
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if( KeGetCurrentIrql() != PASSIVE_LEVEL )
+	{
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if( Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY)
+	{
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	
+
+	 if (Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass == 
+			FileBothDirectoryInformation)
+    {
+        PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
+        ULONG          nextEntryOffset;
+
+		if(Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer == NULL)
+		{
+			return FLT_PREOP_SUCCESS_NO_CALLBACK;		
+		}
+		curEntry = 
+		(PFILE_BOTH_DIR_INFORMATION) Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
+
+
+		if( Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length>0)
+		{
+
+			for(;;)
+			{
+			if(curEntry->NextEntryOffset == 0)
+				break;
+
+			curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
+			}
+        }   
+	}
+
+	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+FLT_POSTOP_CALLBACK_STATUS
+	FilterPostDirectoryControl 
+(
+	__inout PFLT_CALLBACK_DATA Data,
+	__in PCFLT_RELATED_OBJECTS FltObjects,
+	__in_opt PVOID CompletionContext,
+	__in FLT_POST_OPERATION_FLAGS Flags
+)
+{
+	
+	return FLT_POSTOP_FINISHED_PROCESSING;
+	
 }
