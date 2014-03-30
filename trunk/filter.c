@@ -2,16 +2,15 @@
 
 FILTERDATA FilterData;
 
+WCHAR			sFile[256]			= {0};
+#define POOL_TAG_TEMPORARY_BUFFER   'BpmT' 
+
 const FLT_OPERATION_REGISTRATION Callbacks[] = 
 {
 //  Calbacks routins for our filter
-    { IRP_MJ_CREATE,
-      0,
-      NULL,
-      NULL},
 	{ IRP_MJ_DIRECTORY_CONTROL,
       0,
-      FilterPreDirectoryControl,
+      NULL,
       FilterPostDirectoryControl 
 	},
 
@@ -28,8 +27,8 @@ CONST FLT_REGISTRATION FilterRegistration =
     NULL,                               //  Context
     Callbacks,                          //  Operation callbacks
     FilterUnload,                     	//  FilterUnload
-    FilterLoad,                    		//  FilterInstanceSetup
-    NULL,            //  InstanceQueryTeardown
+    NULL,                    		//  FilterInstanceSetup
+    QueryTeardown,            //  InstanceQueryTeardown
     NULL,            //  InstanceTeardownStart
     NULL,            //  InstanceTeardownComplete
 
@@ -37,36 +36,20 @@ CONST FLT_REGISTRATION FilterRegistration =
     NULL            //  NormalizeNameComponent
 };
 
-
 NTSTATUS
-FilterLoad 
-(
+QueryTeardown (
     __in PCFLT_RELATED_OBJECTS FltObjects,
-    __in FLT_INSTANCE_SETUP_FLAGS Flags,
-    __in DEVICE_TYPE VolumeDeviceType,
-    __in FLT_FILESYSTEM_TYPE VolumeFilesystemType
-)
+    __in FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
+    )
 {
     UNREFERENCED_PARAMETER( FltObjects );
     UNREFERENCED_PARAMETER( Flags );
-    UNREFERENCED_PARAMETER( VolumeFilesystemType );
 
     PAGED_CODE();
 
-    ASSERT( FltObjects->Filter == FilterData.pFilter );
-
-    //
-    //  Don't attach to network volumes.
-    //
-
-    if (VolumeDeviceType == FILE_DEVICE_NETWORK_FILE_SYSTEM) 
-	{
-
-       return STATUS_FLT_DO_NOT_ATTACH;
-    }
-
     return STATUS_SUCCESS;
 }
+
 
 NTSTATUS
 FilterUnload (
@@ -124,65 +107,14 @@ DriverEntry
 	}
 
 	DbgPrint("MiniFilter:  Driver was started success.");
+
+	wcscat(sFile,L"Eula.txt");
+
 	return STATUS_SUCCESS;
 
 
 }
 
-
-FLT_PREOP_CALLBACK_STATUS
-	FilterPreDirectoryControl (
-	__inout PFLT_CALLBACK_DATA Data,
-	__in PCFLT_RELATED_OBJECTS FltObjects,
-	__deref_out_opt PVOID *CompletionContext
-	)
-{
-	PFLT_FILE_NAME_INFORMATION nameInfo;
-
-	
-	if (!NT_SUCCESS( Data->IoStatus.Status )) 
-	{
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
-	if( KeGetCurrentIrql() != PASSIVE_LEVEL )
-	{
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
-	if( Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY)
-	{
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
-	
-
-	 if (Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass == 
-			FileBothDirectoryInformation)
-    {
-        PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
-        ULONG          nextEntryOffset;
-
-		if(Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer == NULL)
-		{
-			return FLT_PREOP_SUCCESS_NO_CALLBACK;		
-		}
-		curEntry = 
-		(PFILE_BOTH_DIR_INFORMATION) Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
-
-
-		if( Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length>0)
-		{
-
-			for(;;)
-			{
-			if(curEntry->NextEntryOffset == 0)
-				break;
-
-			curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
-			}
-        }   
-	}
-
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
-}
 
 FLT_POSTOP_CALLBACK_STATUS
 	FilterPostDirectoryControl 
@@ -193,7 +125,79 @@ FLT_POSTOP_CALLBACK_STATUS
 	__in FLT_POST_OPERATION_FLAGS Flags
 )
 {
+	NTSTATUS status;
+
+	PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
+	PVOID tempBuf = NULL;
+    PMDL newMdl = NULL;
+	ULONG len=0;
+	ULONG BufferPosition=0;
+	ULONG prevOffset=0;
+
+
+
+	if (!NT_SUCCESS( Data->IoStatus.Status ) ||
+	    Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY ||
+		Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer == NULL ||
+		KeGetCurrentIrql() != PASSIVE_LEVEL
+		)
+	{
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+	
+	
+	switch (Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass)
+	{
+		case FileBothDirectoryInformation:
+			{
+				curEntry = (PFILE_BOTH_DIR_INFORMATION)Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
+				BufferPosition += curEntry->NextEntryOffset;
+
+				for(;;)
+				{				
+					DbgPrint("Full name cur -  %wS*** size:%i\n",curEntry->FileName, curEntry->FileNameLength);
+
+					if(wcscmp(sFile, curEntry->FileName)==0)
+					{
+						DbgPrint("sFile - %ws  - Compare - %wS",sFile, curEntry->FileName);
+						
+						if( curEntry->NextEntryOffset >0)
+						{
+							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
+							tempBuf = ExAllocatePoolWithTag( NonPagedPool, len, POOL_TAG_TEMPORARY_BUFFER);
+
+							RtlCopyMemory(tempBuf, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len); 
+							RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
+							RtlCopyMemory(curEntry, tempBuf, len);
+
+							ExFreePoolWithTag(tempBuf, POOL_TAG_TEMPORARY_BUFFER); 
+							FltSetCallbackDataDirty(Data); 
+						}
+						else
+						{
+							if(curEntry->NextEntryOffset ==0)
+							{ 
+								curEntry=(PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset); 
+								curEntry->NextEntryOffset=0; 
+								FltSetCallbackDataDirty(Data); 
+							} 
+						}
+
+					}
+					
+					
+					
+					if(curEntry->NextEntryOffset == 0)
+					{
+						break;
+					}
+					prevOffset = curEntry->NextEntryOffset;
+					curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
+					
+				}
+			}
+			break;
+		}
 	
 	return FLT_POSTOP_FINISHED_PROCESSING;
-	
 }

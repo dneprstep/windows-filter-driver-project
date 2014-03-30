@@ -34,24 +34,17 @@ FilterUnload
 );
 
 NTSTATUS
-FilterLoad 
+QueryTeardown 
 (
     __in PCFLT_RELATED_OBJECTS FltObjects,
-    __in FLT_INSTANCE_SETUP_FLAGS Flags,
-    __in DEVICE_TYPE VolumeDeviceType,
-    __in FLT_FILESYSTEM_TYPE VolumeFilesystemType
+    __in FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
 );
+
 
 //////////////////////////////////////
 // IRP_MJ_DIRECTORY_CONTROL routins
 //
 
-FLT_PREOP_CALLBACK_STATUS
-	FilterPreDirectoryControl (
-	__inout PFLT_CALLBACK_DATA Data,
-	__in PCFLT_RELATED_OBJECTS FltObjects,
-	__deref_out_opt PVOID *CompletionContext
-	);
 FLT_POSTOP_CALLBACK_STATUS
 	FilterPostDirectoryControl (
 	__inout PFLT_CALLBACK_DATA Data,
