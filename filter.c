@@ -63,6 +63,8 @@ FilterUnload (
 
     FltUnregisterFilter( FilterData.pFilter );
 
+	DbgPrint("WinMiniFilter: Filter Unregistered.");
+
     return STATUS_SUCCESS;
 }
 
@@ -91,7 +93,7 @@ DriverEntry
 
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("MiniFilter: Driver not started. ERROR FltRegisterFilter - %08x\n", status);
+		DbgPrint("WinMiniFilter: Driver not started. ERROR FltRegisterFilter - %08x\n", status);
 		return status;
 	}
 
@@ -101,11 +103,11 @@ DriverEntry
 	if (!NT_SUCCESS( status )) 
 	{
          FltUnregisterFilter( FilterData.pFilter );
-         DbgPrint("MiniFilter:  Driver not started. ERROR FltStartFiltering - %08x\n", status);
+         DbgPrint("WinMiniFilter:  Driver not started. ERROR FltStartFiltering - %08x\n", status);
          return status;
 	}
 
-	DbgPrint("MiniFilter:  Driver was started success.");
+	DbgPrint("WinMiniFilter:  Driver was started success.");
 
 	RtlInitUnicodeString(&sFile,L"*.TXT");
 
@@ -113,7 +115,6 @@ DriverEntry
 
 
 }
-
 
 FLT_POSTOP_CALLBACK_STATUS
 	FilterPostDirectoryControl 
@@ -127,7 +128,8 @@ FLT_POSTOP_CALLBACK_STATUS
 	NTSTATUS status;
 
 	PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
-	PVOID tempBuf = NULL;
+	PFILE_BOTH_DIR_INFORMATION prevEntry = NULL;
+	PFILE_BOTH_DIR_INFORMATION tempBuf = NULL;
     PMDL newMdl = NULL;
 	ULONG len=0;
 	ULONG BufferPosition=0;
@@ -164,7 +166,7 @@ FLT_POSTOP_CALLBACK_STATUS
 				//		DbgPrint("- %ws  - Compare\n", curEntry->FileName);
 						if(Data->Iopb->OperationFlags == SL_RETURN_SINGLE_ENTRY)
 						{
-							DbgPrint("SL_RETURN_SINGLE_ENTRY - %ws  - Compare - %wS",sFile, curEntry->FileName);	
+							DbgPrint("SL_RETURN_SINGLE_ENTRY - %ws  - Compare - %wS",sFile, curEntry->FileName);
 						}
 	//					else
 						{
@@ -181,17 +183,22 @@ FLT_POSTOP_CALLBACK_STATUS
 						{
 							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
 
-							DbgPrint("NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
+							DbgPrint("Before NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
 							if(prevEntry == NULL)
 							{
+								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
 								RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
 							}
 							else
 							{
-	//							RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
-								tempBuf = (PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset);
-								tempBuf->NextEntryOffset = prevOffset + curEntry->NextEntryOffset;
+								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
+								RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
+//								tempBuf = (PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset);
+//								tempBuf->NextEntryOffset = prevOffset + curEntry->NextEntryOffset;
 							}
+
+							DbgPrint("After NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
+
 						}
 
 					}
