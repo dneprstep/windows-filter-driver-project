@@ -2,8 +2,7 @@
 
 FILTERDATA FilterData;
 
-WCHAR			sFile[256]			= {0};
-#define POOL_TAG_TEMPORARY_BUFFER   'BpmT' 
+UNICODE_STRING			sFile;
 
 const FLT_OPERATION_REGISTRATION Callbacks[] = 
 {
@@ -108,7 +107,7 @@ DriverEntry
 
 	DbgPrint("MiniFilter:  Driver was started success.");
 
-	wcscat(sFile,L"Eula.txt");
+	RtlInitUnicodeString(&sFile,L"*.TXT");
 
 	return STATUS_SUCCESS;
 
@@ -133,6 +132,7 @@ FLT_POSTOP_CALLBACK_STATUS
 	ULONG len=0;
 	ULONG BufferPosition=0;
 	ULONG prevOffset=0;
+	UNICODE_STRING curFileName;
 
 
 
@@ -151,36 +151,47 @@ FLT_POSTOP_CALLBACK_STATUS
 		case FileBothDirectoryInformation:
 			{
 				curEntry = (PFILE_BOTH_DIR_INFORMATION)Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
-				BufferPosition += curEntry->NextEntryOffset;
 
 				for(;;)
-				{				
-					DbgPrint("Full name cur -  %wS*** size:%i\n",curEntry->FileName, curEntry->FileNameLength);
+				{						
+					BufferPosition += curEntry->NextEntryOffset;
+		
+	//				DbgPrint("Full name cur -  %wS*** size:%i\n",curEntry->FileName, curEntry->FileNameLength);
+					RtlInitUnicodeString(&curFileName, curEntry->FileName);
 
-					if(wcscmp(sFile, curEntry->FileName)==0)
+					if(FsRtlIsNameInExpression(&sFile, &curFileName, TRUE, 0))
 					{
-						DbgPrint("sFile - %ws  - Compare - %wS",sFile, curEntry->FileName);
-						
-						if( curEntry->NextEntryOffset >0)
+				//		DbgPrint("- %ws  - Compare\n", curEntry->FileName);
+						if(Data->Iopb->OperationFlags == SL_RETURN_SINGLE_ENTRY)
 						{
-							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
-							tempBuf = ExAllocatePoolWithTag( NonPagedPool, len, POOL_TAG_TEMPORARY_BUFFER);
-
-							RtlCopyMemory(tempBuf, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len); 
-							RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
-							RtlCopyMemory(curEntry, tempBuf, len);
-
-							ExFreePoolWithTag(tempBuf, POOL_TAG_TEMPORARY_BUFFER); 
-							FltSetCallbackDataDirty(Data); 
+							DbgPrint("SL_RETURN_SINGLE_ENTRY - %ws  - Compare - %wS",sFile, curEntry->FileName);	
 						}
-						else
+	//					else
 						{
 							if(curEntry->NextEntryOffset ==0)
-							{ 
+							{
+								DbgPrint("NextEntryOffset ==0 - %ws  - \n", curEntry->FileName);	
 								curEntry=(PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset); 
 								curEntry->NextEntryOffset=0; 
-								FltSetCallbackDataDirty(Data); 
-							} 
+
+
+							}
+						}
+						if( curEntry->NextEntryOffset > 0)
+						{
+							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
+
+							DbgPrint("NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
+							if(prevEntry == NULL)
+							{
+								RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
+							}
+							else
+							{
+	//							RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
+								tempBuf = (PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset);
+								tempBuf->NextEntryOffset = prevOffset + curEntry->NextEntryOffset;
+							}
 						}
 
 					}
@@ -192,6 +203,7 @@ FLT_POSTOP_CALLBACK_STATUS
 						break;
 					}
 					prevOffset = curEntry->NextEntryOffset;
+					prevEntry = curEntry;
 					curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
 					
 				}
