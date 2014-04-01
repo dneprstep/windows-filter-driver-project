@@ -4,6 +4,70 @@ FILTERDATA FilterData;
 
 UNICODE_STRING			sFile;
 
+void HideFile(
+	PFILE_BOTH_DIR_INFORMATION fileInfo,
+	PFLT_CALLBACK_DATA Data
+);
+
+void HideFile(
+	PFILE_BOTH_DIR_INFORMATION fileInfo,
+	PFLT_CALLBACK_DATA Data
+
+)
+{
+	NTSTATUS status;
+
+	PFILE_BOTH_DIR_INFORMATION curEntry = fileInfo;
+	PFILE_BOTH_DIR_INFORMATION prevEntry = NULL;
+	PFILE_BOTH_DIR_INFORMATION tempBuf = NULL;
+	ULONG len=0;
+	ULONG BufferPosition=0;
+	ULONG prevOffset=0;
+	UNICODE_STRING curFileName;
+
+				for(;;)
+				{
+					BufferPosition += curEntry->NextEntryOffset;
+		
+					RtlInitUnicodeString(&curFileName, curEntry->FileName);
+
+					if(FsRtlIsNameInExpression(&sFile, &curFileName, TRUE, 0))
+					{
+						if( curEntry->NextEntryOffset > 0)
+						{								
+							DbgPrint("Before NextEntryOffset > 0 - %ls  - \n", curEntry->FileName);
+						
+							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
+								
+							RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
+							RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
+
+
+							DbgPrint("After NextEntryOffset > 0 - %ls  - \n", curEntry->FileName);
+
+						}
+						else
+							if(curEntry->NextEntryOffset ==0)
+							{
+								DbgPrint("Before NextEntryOffset ==0 - %ls  - \n", curEntry->FileName);
+								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
+								prevEntry->NextEntryOffset=0; 
+								DbgPrint("After NextEntryOffset ==0 - %ls  - \n", curEntry->FileName);			
+							}
+					}
+					
+					if(curEntry->NextEntryOffset == 0)
+					{
+						break;
+					}
+					
+					prevOffset = curEntry->NextEntryOffset;
+					prevEntry = curEntry;
+					curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
+				}
+
+}
+
 const FLT_OPERATION_REGISTRATION Callbacks[] = 
 {
 //  Calbacks routins for our filter
@@ -74,8 +138,6 @@ DriverEntry
 )
 {
 
-
-
 	NTSTATUS status;
 	
 	UNREFERENCED_PARAMETER( RegistryPath );
@@ -123,12 +185,12 @@ FLT_POSTOP_CALLBACK_STATUS
 	__in_opt PVOID CompletionContext,
 	__in FLT_POST_OPERATION_FLAGS Flags
 )
+{
 	NTSTATUS status;
 
 	PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
 	PFILE_BOTH_DIR_INFORMATION prevEntry = NULL;
 	PFILE_BOTH_DIR_INFORMATION tempBuf = NULL;
-    PMDL newMdl = NULL;
 	ULONG len=0;
 	ULONG BufferPosition=0;
 	ULONG prevOffset=0;
@@ -151,63 +213,30 @@ FLT_POSTOP_CALLBACK_STATUS
 		case FileBothDirectoryInformation:
 			{
 				curEntry = (PFILE_BOTH_DIR_INFORMATION)Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
-
-				for(;;)
-				{						
-					BufferPosition += curEntry->NextEntryOffset;
-		
-	//				DbgPrint("Full name cur -  %wS*** size:%i\n",curEntry->FileName, curEntry->FileNameLength);
-					RtlInitUnicodeString(&curFileName, curEntry->FileName);
-
-					if(FsRtlIsNameInExpression(&sFile, &curFileName, TRUE, 0))
-					{
-				//		DbgPrint("- %ws  - Compare\n", curEntry->FileName);
-						if(Data->Iopb->OperationFlags == SL_RETURN_SINGLE_ENTRY)
-						{
-							DbgPrint("SL_RETURN_SINGLE_ENTRY - %ws  - Compare - %wS",sFile, curEntry->FileName);
-						}
-						if( curEntry->NextEntryOffset > 0)
-						{
-							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
-
-							DbgPrint("Before NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
-							if(prevEntry == NULL)
-							{
-								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
-								RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
-							}
-							else
-							{
-								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
-								RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
-//								tempBuf = (PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset);
-//								tempBuf->NextEntryOffset = prevOffset + curEntry->NextEntryOffset;
-							}
-
-							DbgPrint("After NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
-
-						}
-						if(curEntry->NextEntryOffset ==0)
-						{
-								DbgPrint("NextEntryOffset ==0 - %ws  - \n", curEntry->FileName);	
-								curEntry=(PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset); 
-								curEntry->NextEntryOffset=0; 
-						}
-					}
-					
-					
-					
-					if(curEntry->NextEntryOffset == 0)
-					{
-						break;
-					}
-					prevOffset = curEntry->NextEntryOffset;
-					prevEntry = curEntry;
-					curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
-					
-				}
+				HideFile(curEntry, Data);
 			}
 			break;
+			case FileDirectoryInformation:
+			{
+			} 
+			break;
+			case FileFullDirectoryInformation:
+			{
+			} 
+			break;
+			case FileIdBothDirectoryInformation:
+			{
+			} 
+			break;
+			case FileIdFullDirectoryInformation:
+			{
+			} 
+			break;
+			case FileNamesInformation:
+			{
+			} 
+			break;
+
 		}
 	
 	return FLT_POSTOP_FINISHED_PROCESSING;
