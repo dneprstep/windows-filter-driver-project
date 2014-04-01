@@ -63,8 +63,6 @@ FilterUnload (
 
     FltUnregisterFilter( FilterData.pFilter );
 
-	DbgPrint("WinMiniFilter: Filter Unregistered.");
-
     return STATUS_SUCCESS;
 }
 
@@ -93,7 +91,7 @@ DriverEntry
 
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("WinMiniFilter: Driver not started. ERROR FltRegisterFilter - %08x\n", status);
+		DbgPrint("MiniFilter: Driver not started. ERROR FltRegisterFilter - %08x\n", status);
 		return status;
 	}
 
@@ -103,11 +101,11 @@ DriverEntry
 	if (!NT_SUCCESS( status )) 
 	{
          FltUnregisterFilter( FilterData.pFilter );
-         DbgPrint("WinMiniFilter:  Driver not started. ERROR FltStartFiltering - %08x\n", status);
+         DbgPrint("MiniFilter:  Driver not started. ERROR FltStartFiltering - %08x\n", status);
          return status;
 	}
 
-	DbgPrint("WinMiniFilter:  Driver was started success.");
+	DbgPrint("MiniFilter:  Driver was started success.");
 
 	RtlInitUnicodeString(&sFile,L"*.TXT");
 
@@ -115,6 +113,7 @@ DriverEntry
 
 
 }
+
 
 FLT_POSTOP_CALLBACK_STATUS
 	FilterPostDirectoryControl 
@@ -124,7 +123,6 @@ FLT_POSTOP_CALLBACK_STATUS
 	__in_opt PVOID CompletionContext,
 	__in FLT_POST_OPERATION_FLAGS Flags
 )
-{
 	NTSTATUS status;
 
 	PFILE_BOTH_DIR_INFORMATION curEntry = NULL;
@@ -168,17 +166,6 @@ FLT_POSTOP_CALLBACK_STATUS
 						{
 							DbgPrint("SL_RETURN_SINGLE_ENTRY - %ws  - Compare - %wS",sFile, curEntry->FileName);
 						}
-	//					else
-						{
-							if(curEntry->NextEntryOffset ==0)
-							{
-								DbgPrint("NextEntryOffset ==0 - %ws  - \n", curEntry->FileName);	
-								curEntry=(PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset); 
-								curEntry->NextEntryOffset=0; 
-
-
-							}
-						}
 						if( curEntry->NextEntryOffset > 0)
 						{
 							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
@@ -200,7 +187,12 @@ FLT_POSTOP_CALLBACK_STATUS
 							DbgPrint("After NextEntryOffset > 0 - %ws  - \n", curEntry->FileName);
 
 						}
-
+						if(curEntry->NextEntryOffset ==0)
+						{
+								DbgPrint("NextEntryOffset ==0 - %ws  - \n", curEntry->FileName);	
+								curEntry=(PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset); 
+								curEntry->NextEntryOffset=0; 
+						}
 					}
 					
 					
