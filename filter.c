@@ -297,6 +297,12 @@ FLT_POSTOP_CALLBACK_STATUS
 				}	
 				else
 				{
+					if(prevEntry == NULL)
+					{
+						status = STATUS_NO_MORE_FILES;
+						break;
+					}
+
 					SetNextEntryOffset(prevEntry, fileInfo, 0);
 					break;
 				}					
