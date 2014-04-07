@@ -10,6 +10,12 @@ typedef struct _FILTERDATA
     PFLT_FILTER pFilter;
 } FILTERDATA, *PFILTERDATA;
 
+typedef struct _HIDEFILEMASKS
+{
+	UNICODE_STRING pMask;
+	PVOID nextMask;
+} HideFileMasks, *PHideFileMasks;
+
 extern FILTERDATA FilterData;
 
 
@@ -19,12 +25,6 @@ extern FILTERDATA FilterData;
 //
 // implementation in filter.c
 /////////////////////////////////////////////////////////
-
-NTSTATUS
-QueryTeardown (
-    __in PCFLT_RELATED_OBJECTS FltObjects,
-    __in FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
-    );
 
 NTSTATUS
 DriverEntry 
@@ -40,35 +40,17 @@ FilterUnload
 );
 
 NTSTATUS
-FilterLoad 
+QueryTeardown 
 (
     __in PCFLT_RELATED_OBJECTS FltObjects,
-    __in FLT_INSTANCE_SETUP_FLAGS Flags,
-    __in DEVICE_TYPE VolumeDeviceType,
-    __in FLT_FILESYSTEM_TYPE VolumeFilesystemType
+    __in FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
 );
-
-BOOLEAN InHideList(IN PUNICODE_STRING fileName);
-
-ULONG GetNextEntryOffset(IN PVOID pData,IN FILE_INFORMATION_CLASS fileInfo);
- 
-VOID SetNextEntryOffset(IN PVOID pData,IN FILE_INFORMATION_CLASS fileInfo,IN ULONG Offset);   
-
-PWSTR  GetEntryFileName(IN PVOID pData,IN FILE_INFORMATION_CLASS fileInfo);   
-
-ULONG GetEntryFileNameLength (IN PVOID pData,IN FILE_INFORMATION_CLASS fileInfo); 
 
 
 //////////////////////////////////////
 // IRP_MJ_DIRECTORY_CONTROL routins
 //
 
-FLT_PREOP_CALLBACK_STATUS
-	FilterPreDirectoryControl (
-	__inout PFLT_CALLBACK_DATA Data,
-	__in PCFLT_RELATED_OBJECTS FltObjects,
-	__deref_out_opt PVOID *CompletionContext
-	);
 FLT_POSTOP_CALLBACK_STATUS
 	FilterPostDirectoryControl (
 	__inout PFLT_CALLBACK_DATA Data,
@@ -76,5 +58,16 @@ FLT_POSTOP_CALLBACK_STATUS
 	__in_opt PVOID CompletionContext,
 	__in FLT_POST_OPERATION_FLAGS Flags
 	);
+
+
+
+BOOLEAN InHideList(IN PUNICODE_STRING fileName);
+VOID maskList();
+BOOLEAN Add_Mask(PANSI_STRING aStroka);
+
+VOID cleanUpMasks();
+BOOLEAN parseMasksString();
+
 /////////////////////////////////////////////
 #endif /* __FILTER_H__ */
+
