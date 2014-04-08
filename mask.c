@@ -200,7 +200,8 @@ BOOLEAN Add_Mask(PANSI_STRING aStroka)
 	////////////////////////
 	//not head add
 	else
-	{	
+	{
+	    PHideFileMasks currMask = NULL;
 		PHideFileMasks tmpMask = g_hMask;
 
 		//till the end of the list
@@ -210,30 +211,26 @@ BOOLEAN Add_Mask(PANSI_STRING aStroka)
 		}
 
 		//alloc memory
-		tmpMask->nextMask = ExAllocatePoolWithTag(NonPagedPool, sizeof(HideFileMasks), MASK_POOL);
-		if(tmpMask->nextMask == NULL)
+		currMask = ExAllocatePoolWithTag(NonPagedPool, sizeof(HideFileMasks), MASK_POOL);
+		if(currMask == NULL)
 		{
 			DbgPrint("WinMiniFilter: Add_Mask - tmpMask - memory alloc ERROR");
 			return FALSE;
 		}
-		RtlZeroMemory(tmpMask->nextMask, sizeof(HideFileMasks));
-		
-
-
-		tmpMask = tmpMask->nextMask;
+		RtlZeroMemory(currMask, sizeof(HideFileMasks));
 		
 		//convert ANSI to UNICODE
-		status = RtlAnsiStringToUnicodeString(&tmpMask->pMask, aStroka,  TRUE);
+		status = RtlAnsiStringToUnicodeString(&currMask->pMask, aStroka,  TRUE);
 		if (!NT_SUCCESS(status))
 		{
-			ExFreePoolWithTag (tmpMask->nextMask, MASK_POOL);
-			tmpMask->nextMask = NULL;
+			ExFreePoolWithTag (currMask, MASK_POOL);
 			DbgPrint("MiniFilter: Add_Mask RtlAnsiStringToUnicodeString error  - status: %08x\n", status);
 			return FALSE;
 		}
 		
 		//end of the list
-		tmpMask->nextMask = NULL;
+		currMask->nextMask = NULL;
+		tmpMask->nextMask = currMask;
 
 	}
 
@@ -277,59 +274,22 @@ BOOLEAN parseMasksString()
 	PCHAR 		pMasks = NULL;
 	PCHAR 		tmpMaskStr = NULL;
 	ANSI_STRING tmpAnsi;
-	
-	SIZE_T count = 0;
-
 
 	//if our g_masksStr exist
 	if ( g_masksStr == NULL)
 		return FALSE;
 	
 	pMasks = g_masksStr;
+	tmpMaskStr = g_masksStr;
 
 	//till the end of the string
 	while (*pMasks !='\0')
 	{		
-		count++;
 		//separator
 		if(*pMasks == ';')
 		{
-			try
-			{
-				/////////////////////////////////////////
-				//alloc temp string to convert it to ANSI
-				SIZE_T poolSize = count*sizeof(PCHAR);
-				if( tmpMaskStr!=NULL )
-				{
-					ExFreePoolWithTag (tmpMaskStr, MASK_POOL);
-					tmpMaskStr = NULL;
-				}
-				if(poolSize > 0)
-				{
-					tmpMaskStr = ExAllocatePoolWithTag(NonPagedPool, poolSize, MASK_POOL);
-					if(tmpMaskStr == NULL)
-					{
-						DbgPrint("WinMiniFilter: parseMasks - tmpMaskStr - memory alloc ERROR");
-						return FALSE;
-					}
-				}
-				else
-					return FALSE;			
-				RtlZeroMemory(tmpMaskStr, poolSize);
-				
-				
-				
-				
-				//copy from masks string to temp string
-				if(count > 0 &&  tmpMaskStr != NULL && pMasks != NULL)
-					RtlCopyMemory(tmpMaskStr, pMasks-count+1, count*sizeof(PCHAR));
-				if(tmpMaskStr==NULL)
-				{
-					return FALSE;
-				}
-				//end of the string
-				tmpMaskStr[poolSize/sizeof(PCHAR)-1]='\0';
-				
+		        *pMasks = '\0';
+
 				//Init AnsiString
 				RtlInitAnsiString(&tmpAnsi, tmpMaskStr);
 				
@@ -338,16 +298,8 @@ BOOLEAN parseMasksString()
 				{
 					DbgPrint("WinMiniFilter: parseMasks - Add_Mask - ERROR");
 				}
-
-			}
-			finally
-			{				
-				//free temp string
-				if(tmpMaskStr !=NULL)
-					ExFreePoolWithTag (tmpMaskStr, MASK_POOL);
-				tmpMaskStr = NULL;
-				count = 0;
-			}
+				
+				tmpMaskStr = pMasks + 1;
 		}
 		
 		pMasks++;
