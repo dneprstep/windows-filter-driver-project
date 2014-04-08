@@ -8,4 +8,5 @@ INCLUDES=$(INCLUDES);..\inc
 TARGETLIBS=$(TARGETLIBS) \
            $(IFSKIT_LIB_PATH)\fltMgr.lib
 
-SOURCES=filter.c
+SOURCES=filter.c \
+		mask.c
