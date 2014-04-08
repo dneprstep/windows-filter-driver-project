@@ -1,10 +1,7 @@
 #ifndef __MASK_H__
 #define __MASK_H__
 
-#define g_masksStr_POOL 'gmSP'
-#define tmpMaskStr_POOL 'tmSP'
-#define Add_MASK_tmpMask_POOL 'amtM'
-#define g_hMask_POOL 'ghMP'
+#define MASK_POOL 'mP'
 
 typedef struct _HIDEFILEMASKS
 {
