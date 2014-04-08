@@ -22,7 +22,6 @@ BOOLEAN InHideList(IN PUNICODE_STRING fileName)
 
 		do
 		{
-	//		DbgPrint("Hide File - %wZ - mask - %wZ -\n", fileName, &tmpMask->pMask);
 			status = FsRtlIsNameInExpression(&tmpMask->pMask, fileName, TRUE, 0);
 			if(status)
 				break;
